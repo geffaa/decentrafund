@@ -1,0 +1,25 @@
+{
+  "name": "decentrafund",
+  "version": "1.0.0",
+  "description": "Decentralized Crowdfunding Platform - Full-Stack Blockchain Portfolio",
+  "private": true,
+  "workspaces": [
+    "packages/contracts",
+    "packages/backend",
+    "packages/frontend"
+  ],
+  "scripts": {
+    "contracts:compile": "npm run compile --workspace=packages/contracts",
+    "contracts:test": "npm run test --workspace=packages/contracts",
+    "contracts:deploy": "npm run deploy --workspace=packages/contracts",
+    "backend:dev": "npm run dev --workspace=packages/backend",
+    "frontend:dev": "npm run dev --workspace=packages/frontend",
+    "dev": "concurrently \"npm run backend:dev\" \"npm run frontend:dev\""
+  },
+  "devDependencies": {
+    "concurrently": "^8.2.2"
+  },
+  "dependencies": {
+    "lodash": "^4.17.23"
+  }
+}

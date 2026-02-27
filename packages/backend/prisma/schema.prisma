@@ -1,0 +1,168 @@
+// Prisma Schema for DecentraFund Backend
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ============ Models ============
+
+model User {
+  id            String    @id @default(uuid())
+  walletAddress String    @unique @map("wallet_address")
+  username      String?
+  email         String?
+  avatarUrl     String?   @map("avatar_url")
+  bio           String?
+  nonce         String    @default(uuid()) // For SIWE authentication
+  createdAt     DateTime  @default(now()) @map("created_at")
+  updatedAt     DateTime  @updatedAt @map("updated_at")
+
+  campaigns     Campaign[]       @relation("CampaignCreator")
+  contributions Contribution[]
+  votes         MilestoneVote[]
+  notifications Notification[]
+
+  @@map("users")
+}
+
+model Campaign {
+  id              String         @id @default(uuid())
+  contractAddress String         @unique @map("contract_address")
+  creatorId       String         @map("creator_id")
+  title           String
+  description     String         @db.Text
+  shortDesc       String?        @map("short_desc")
+  imageHash       String?        @map("image_hash") // IPFS hash
+  imageUrl        String?        @map("image_url")
+  category        String
+  targetAmount    String         @map("target_amount")     // Wei as string (BigInt)
+  currentAmount   String         @default("0") @map("current_amount")
+  deadline        DateTime
+  status          CampaignStatus @default(ACTIVE)
+  txHash          String?        @map("tx_hash")
+  totalBackers    Int            @default(0) @map("total_backers")
+  featured        Boolean        @default(false)
+  createdAt       DateTime       @default(now()) @map("created_at")
+  updatedAt       DateTime       @updatedAt @map("updated_at")
+
+  creator       User             @relation("CampaignCreator", fields: [creatorId], references: [id])
+  milestones    Milestone[]
+  contributions Contribution[]
+
+  @@index([category])
+  @@index([status])
+  @@index([creatorId])
+  @@map("campaigns")
+}
+
+model Milestone {
+  id           String          @id @default(uuid())
+  campaignId   String          @map("campaign_id")
+  index        Int             // On-chain milestone index
+  description  String
+  amount       String          // Wei as string
+  status       MilestoneStatus @default(PENDING)
+  votesFor     Int             @default(0) @map("votes_for")
+  votesAgainst Int             @default(0) @map("votes_against")
+  votingDeadline DateTime?     @map("voting_deadline")
+  fundsReleased Boolean        @default(false) @map("funds_released")
+  createdAt    DateTime        @default(now()) @map("created_at")
+  updatedAt    DateTime        @updatedAt @map("updated_at")
+
+  campaign Campaign        @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  votes    MilestoneVote[]
+
+  @@unique([campaignId, index])
+  @@map("milestones")
+}
+
+model Contribution {
+  id          String   @id @default(uuid())
+  userId      String   @map("user_id")
+  campaignId  String   @map("campaign_id")
+  amount      String   // Wei as string
+  txHash      String   @unique @map("tx_hash")
+  blockNumber Int?     @map("block_number")
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  user     User     @relation(fields: [userId], references: [id])
+  campaign Campaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([campaignId])
+  @@map("contributions")
+}
+
+model MilestoneVote {
+  id          String   @id @default(uuid())
+  userId      String   @map("user_id")
+  milestoneId String   @map("milestone_id")
+  support     Boolean
+  voteWeight  String   @map("vote_weight") // Wei as string
+  txHash      String?  @map("tx_hash")
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  user      User      @relation(fields: [userId], references: [id])
+  milestone Milestone @relation(fields: [milestoneId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, milestoneId])
+  @@map("milestone_votes")
+}
+
+model Notification {
+  id        String           @id @default(uuid())
+  userId    String           @map("user_id")
+  type      NotificationType
+  title     String
+  message   String
+  data      Json?            // Additional metadata
+  read      Boolean          @default(false)
+  createdAt DateTime         @default(now()) @map("created_at")
+
+  user User @relation(fields: [userId], references: [id])
+
+  @@index([userId, read])
+  @@map("notifications")
+}
+
+model PlatformStats {
+  id               String   @id @default(uuid())
+  totalCampaigns   Int      @default(0) @map("total_campaigns")
+  totalFunded      String   @default("0") @map("total_funded") // Wei
+  totalBackers     Int      @default(0) @map("total_backers")
+  successRate      Float    @default(0) @map("success_rate")
+  lastUpdated      DateTime @default(now()) @map("last_updated")
+
+  @@map("platform_stats")
+}
+
+// ============ Enums ============
+
+enum CampaignStatus {
+  ACTIVE
+  SUCCESSFUL
+  FAILED
+  CANCELLED
+}
+
+enum MilestoneStatus {
+  PENDING
+  VOTING
+  APPROVED
+  REJECTED
+}
+
+enum NotificationType {
+  CAMPAIGN_FUNDED
+  MILESTONE_SUBMITTED
+  MILESTONE_APPROVED
+  MILESTONE_REJECTED
+  REFUND_AVAILABLE
+  CAMPAIGN_COMPLETED
+  SYSTEM
+}
